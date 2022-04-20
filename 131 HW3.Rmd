@@ -1,14 +1,99 @@
 ---
-title: "Untitled"
-author: "Scott Shang"
-date: '2022-04-20'
-output: html_document
+title: "131 Homework3"
+author: "Scott Shang (8458655)"
+date: "`r format(Sys.Date(), '%B %d, %Y')`"
+output:
+  pdf_document: default
+  html_document:
+    df_print: paged
 ---
 
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+---
+title: "131 Homework3"
+author: "Scott Shang (8458655)"
+date: "`r format(Sys.Date(), '%B %d, %Y')`"
+output: pdf_document
+---
+
+```{r setup, echo=FALSE}
+library(knitr)
+# set global chunk options: images will be 7x5 inches
+knitr::opts_chunk$set(fig.width=7, fig.height=5)
+options(digits = 4)
+
+
+## indents are for indenting r code as formatted text
+## They may need to be adjusted depending on your OS
+# if your output looks odd, increase or decrease indent
+indent1 = '    '
+indent2 = '        '
+indent3 = '            '
 ```
 
-```{r pressure, echo=FALSE}
-plot(pressure)
+Question1
+```{r}
+library("tidyverse")
+library("tidymodels")
+abalone=read_csv('abalone.csv')
+head(abalone)
+abalone$age=abalone$rings+1.5
+head(abalone)
+hist(abalone$age,breaks=20)
+summary(abalone$age)
 ```
+From the histogram above, we notice that the distribution of age is partially normal distributed, but slightly skewed to the right, with minimum 2.5, maximum 30.5, and mean 11.4. 
+
+Question2
+```{r}
+set.seed(1234)
+ab_split=initial_split(abalone,prop=0.80,strata=age)
+ab_train=training(ab_split)
+ab_test=testing(ab_split)
+```
+
+
+Question3
+```{r}
+ab_recipe=recipe(age~type+longest_shell+diameter+height+whole_weight+shucked_weight+viscera_weight+shell_weight,data=ab_train)%>%
+  step_dummy(all_nominal_predictors())%>%
+  step_interact(terms=~type_I:shucked_weight+type_M:shucked_weight+longest_shell:diameter+shucked_weight:shell_weight)%>%
+  step_normalize(all_predictors())
+
+```
+We shouldn't use rings to predict age because age is depends on age, so we won't have the relation between age and other predictors.
+
+Question4
+```{r}
+lm_model=linear_reg()%>% 
+  set_engine("lm")
+```
+
+
+Question5
+```{r}
+lm_wflow=workflow() %>% 
+  add_model(lm_model) %>% 
+  add_recipe(ab_recipe)
+```
+
+
+Question6
+```{r}
+lm_fit=fit(lm_wflow,ab_train)
+
+ab_test=data.frame("type"="F","longest_shell" = 0.50, "diameter" = 0.10, "height" = 0.30, "whole_weight" = 4, "shucked_weight" = 1, "viscera_weight" = 2, "shell_weight" = 1)
+
+predict(lm_fit,new_data=ab_test)
+```
+
+
+Question7
+```{r}
+ab_metric=metric_set(rsq,rmse,mae)
+ab_pred=predict(lm_fit,new_data=ab_train%>%select(-age))
+ab_pred=bind_cols(ab_pred,ab_train%>%select(age))
+ab_pred
+
+ab_metric(ab_pred,truth=age,estimate=.pred)
+```
+The R-squared value we got is 0.55. It's a measure of how much variation of the response variable is explained by the predictors. In this case, we found that our model is not that good. 
